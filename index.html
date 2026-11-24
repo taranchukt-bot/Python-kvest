@@ -1,0 +1,708 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Python-квест: Консоль (Copy)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: одна колонка-«бортовий комп'ютер»; липка панель з зірками й кнопкою «Мій результат»; екрани: мапа корабля → урок-пісочниця → завдання → ремонт системи → старт */
+:root{
+  --bg:#0c1416; --panel:#142024; --panel2:#1a2a2f; --line:#2a3c42; --term:#081012;
+  --fg:#e4eeec; --muted:#91a8a4; --accent:#ffc85c; --accent-ink:#2a1d00;
+  --ok:#6fd39a; --bad:#ff8272; --str:#9fd8ff; --num:#ffb37a; --kw:#c7a6ff;
+  --f-display:"Unbounded","Manrope",system-ui,sans-serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:16px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:640px;margin:0 auto;padding-block:0 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(26px,7.4vw,38px);font-weight:700}
+h2{font-size:clamp(20px,5.4vw,24px);font-weight:500}
+h3{font-size:16px;font-weight:500}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.muted{color:var(--muted)}
+.screen{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+code{font-family:var(--f-mono);background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:.92em}
+/* top bar */
+.hud{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding-block:10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.hud>button.ghost{padding:8px 12px;font-size:14px}
+.player{flex:1;min-width:0;display:flex;gap:10px;align-items:center;text-align:left;padding:8px 12px;font-weight:400}
+.avatar{width:38px;height:38px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;flex:none}
+.pmeta{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.pline{display:flex;justify-content:space-between;gap:8px}
+.pname{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pstars{font-family:var(--f-mono);font-size:13px;color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pbar{height:6px;background:var(--term);border-radius:99px;overflow:hidden}
+.pbar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .5s}
+.prank{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* toast */
+.toasts{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.toast{background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-weight:700;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,.35);animation:tin .3s ease-out}
+@keyframes tin{from{transform:translateY(12px);opacity:0}}
+/* controls */
+label{font-size:14px;font-weight:600;color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+input[type=text]{font:inherit;font-size:17px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;width:100%;box-sizing:border-box}
+input[type=text]:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>.field{flex:1 1 160px}
+button{font:inherit;font-weight:700;font-size:16px;border-radius:10px;padding:12px 16px;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--fg)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.ghost{background:none}
+button.link{background:none;border:none;color:var(--muted);text-decoration:underline;padding:6px 0;font-weight:600;font-size:14px;align-self:flex-start}
+button:disabled{opacity:.45;cursor:not-allowed}
+/* robot */
+.bot{display:flex;gap:12px;align-items:flex-start}
+.bot svg{flex:0 0 56px;width:56px;height:62px}
+.bubble{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:15px;min-width:0;flex:1}
+.bubble::before{content:"";position:absolute;left:-7px;top:18px;width:12px;height:12px;background:var(--panel2);border-left:1px solid var(--line);border-bottom:1px solid var(--line);transform:rotate(45deg)}
+.bubble b{color:var(--accent)}
+.bot .eye{transition:all .2s}
+@keyframes bob{50%{transform:translateY(-3px)}}
+.bot.happy svg{animation:bob .5s ease-in-out 2}
+/* ship map */
+.ship{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:stretch}
+@media (max-width:400px){.ship{grid-template-columns:96px 1fr}}
+.ship svg{width:100%;height:auto;max-width:100%}
+.ship .sec{fill:var(--panel2);stroke:var(--line);stroke-width:2;transition:fill .4s}
+.ship .sec.done{fill:var(--accent)}
+.ship .sec.cur{stroke:var(--accent);stroke-dasharray:6 4}
+.levels{display:flex;flex-direction:column;gap:10px;min-width:0}
+.lvl{display:flex;flex-direction:column;gap:2px;text-align:left;padding:12px 14px;font-weight:400}
+.lvl .t{font-family:var(--f-display);font-size:14px;font-weight:500}
+.lvl .s{font-size:13px;color:var(--muted)}
+.lvl .st{font-family:var(--f-mono);font-size:13px;color:var(--accent);letter-spacing:.05em}
+.lvl.cur{border-color:var(--accent)}
+.lvl.locked{opacity:.5}
+/* lesson */
+.points{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.points li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:baseline}
+.points li::before{content:">";font-family:var(--f-mono);color:var(--accent)}
+/* console */
+.con{background:var(--term);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.con .bar{display:flex;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.con .log{font-family:var(--f-mono);font-size:14px;padding:10px 12px;max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:2px;min-height:44px}
+.con .log .in{color:var(--muted);white-space:pre-wrap;word-break:break-all}
+.con .log .in b{color:var(--accent);font-weight:400}
+.con .log .out{color:var(--ok);white-space:pre-wrap;word-break:break-all}
+.con .log .err{color:var(--bad);white-space:pre-wrap}
+.con .log .tip{color:var(--fg);font-family:var(--f-body);font-size:13px;opacity:.85}
+.con .log .empty{color:#557074;font-size:13px}
+.con form{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding:6px 6px 6px 12px}
+.con form span{font-family:var(--f-mono);color:var(--accent)}
+.con form input{flex:1;min-width:0;font-family:var(--f-mono)!important;font-size:16px!important;background:transparent!important;border:none!important;padding:8px 4px!important}
+.con form input:focus{outline:none}
+.con form button{padding:8px 14px;font-size:14px}
+.keys{display:flex;flex-wrap:wrap;gap:6px;padding:0 8px 8px}
+.keys button{font-family:var(--f-mono);font-weight:600;font-size:15px;padding:6px 0;min-width:40px;flex:1 0 40px;background:var(--panel)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{font-family:var(--f-mono);font-weight:400;font-size:14px;padding:7px 10px;color:var(--str)}
+/* tasks */
+.code{font-family:var(--f-mono);font-size:15px;background:var(--term);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+.code .bar{display:flex;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.code pre{margin:0;padding:12px 14px;line-height:1.6;counter-reset:ln}
+.code .ln{display:block;white-space:pre}
+.code .ln::before{counter-increment:ln;content:counter(ln);display:inline-block;width:1.6em;color:#45585d;user-select:none}
+.t-kw{color:var(--kw)}.t-str{color:var(--str)}.t-num{color:var(--num)}.t-com{color:#6c8580;font-style:italic}.t-blank{color:var(--bg);background:var(--accent);border-radius:3px;padding:0 4px}
+.stdin{font-family:var(--f-mono);font-size:14px;background:var(--panel2);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.stdin .h{color:var(--muted);font-size:12px}
+.stdin .v{color:var(--ok)}
+.q{font-size:17px;font-weight:600}
+.choices{display:flex;flex-direction:column;gap:8px}
+.choices button{text-align:left;font-family:var(--f-mono);font-weight:400;font-size:15px;white-space:pre-wrap}
+.choices button.wrong{border-color:var(--bad);color:var(--bad)}
+.choices button.right{border-color:var(--ok);color:var(--ok)}
+.answer{display:flex;gap:8px}
+.answer input{font-family:var(--f-mono)!important;flex:1;min-width:0}
+.fb{border-radius:10px;padding:12px 14px;font-size:15px;display:flex;flex-direction:column;gap:8px}
+.fb.ok{background:color-mix(in srgb,var(--ok) 14%,transparent);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+.fb.try{background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent)}
+.fb.show{background:var(--panel2);border:1px solid var(--line)}
+.fb button{align-self:flex-start;padding:8px 12px;font-size:14px}
+.tstars{font-family:var(--f-mono);font-size:20px;letter-spacing:.15em;color:var(--accent)}
+.tstars .off{color:var(--line)}
+.prog{display:flex;gap:6px}
+.prog span{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.prog span.done{background:var(--accent)}
+.prog span.cur{background:var(--fg)}
+/* results */
+.rcard{border:2px solid var(--accent);border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:18px;background:var(--panel);position:relative;overflow:hidden}
+.rcard::after{content:"";position:absolute;right:-60px;top:-60px;width:180px;height:180px;border-radius:50%;border:2px dashed var(--line);pointer-events:none}
+.rhead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px 14px;flex-wrap:wrap;position:relative;z-index:1}
+.rhead h2{margin-top:4px}
+.rank{font-family:var(--f-mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:5px 10px;border-radius:8px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);white-space:nowrap}
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media (max-width:480px){.rgrid{grid-template-columns:repeat(2,1fr)}}
+.rstat{background:var(--panel2);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.rstat b{font-family:var(--f-display);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.rstat span{font-size:12px;color:var(--muted)}
+.rstat.main{background:var(--accent);color:var(--accent-ink)}
+.rstat.main span{color:var(--accent-ink);opacity:.75}
+.rstat.main b{font-size:34px}
+.badges{display:flex;flex-wrap:wrap;gap:8px}
+.badge{display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:99px;padding:4px 12px 4px 4px;font-size:13px;font-weight:600}
+.badge i{min-width:28px;height:28px;padding:0 4px;box-sizing:border-box;border-radius:99px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-style:normal;font-family:var(--f-mono);font-size:11px;font-weight:700}
+.badge.locked{opacity:.4;font-weight:400}
+.badge.locked i{background:var(--line);color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+td,th{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+td.s{font-family:var(--f-mono);color:var(--accent);white-space:nowrap}
+td.s .off{color:var(--line)}
+.st-ok{color:var(--ok)}.st-bad{color:var(--bad)}
+/* launch */
+.launch{position:relative;height:300px;overflow:hidden;border-radius:14px;background:radial-gradient(ellipse at 50% 120%,#1d3238 0%,var(--term) 70%);border:1px solid var(--line)}
+.launch .rk{position:absolute;left:50%;bottom:24px;width:70px;margin-left:-35px;transition:transform 2.6s cubic-bezier(.5,0,.8,.3)}
+.launch.go .rk{transform:translateY(-420px)}
+.launch .flame{opacity:0;transition:opacity .3s}
+.launch.go .flame{opacity:1;animation:fl .12s infinite alternate}
+@keyframes fl{to{transform:scaleY(1.25)}}
+.launch .count{position:absolute;left:14px;top:12px;font-family:var(--f-mono);font-size:14px;color:var(--ok);white-space:pre}
+.launch .dot{position:absolute;width:2px;height:2px;background:var(--fg);border-radius:50%;opacity:.6}
+@media (prefers-reduced-motion:reduce){.launch .rk{transition:none}.launch.go .flame,.bot.happy svg{animation:none}}
+.confirm{display:flex;flex-direction:column;gap:10px}
+</style>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="wrap">
+  <div class="hud" id="hud" hidden>
+    <button class="player" id="hud-res" type="button" aria-label="Мій результат">
+      <span class="avatar" id="p-ava">?</span>
+      <span class="pmeta">
+        <span class="pline"><span class="pname" id="p-name"></span><span class="pstars" id="p-stars"></span></span>
+        <span class="pbar"><i id="p-bar" style="width:0"></i></span>
+        <span class="prank" id="p-rank"></span>
+      </span>
+    </button>
+    <button class="ghost" id="hud-map">Мапа</button>
+  </div>
+
+  <!-- START -->
+  <section id="scr-start" class="screen">
+    <div class="card" style="gap:18px;margin-top:20px">
+      <div class="eyebrow">Інформатика · 7 клас · Python</div>
+      <h1>Python-квест: Консоль</h1>
+      <div class="bot" data-bot><svg></svg><div class="bubble">Привіт! Я робот <b>Байт</b>. Мій корабель «Пітон-1» зламався на орбіті. Бортовий комп'ютер розуміє тільки Python. Допоможи полагодити 4 системи, і ми полетимо додому!</div></div>
+      <div id="resume" hidden class="card" style="background:var(--panel2)">
+        <p>Ти вже грав(-ла) як <b id="resume-name"></b>. Прогрес збережено.</p>
+        <div class="row"><button class="primary" id="btn-resume" style="flex:1 1 160px">Продовжити</button><button id="btn-new" style="flex:1 1 160px">Новий гравець</button></div>
+        <div class="confirm" id="new-confirm" hidden><p class="muted" style="font-size:14px">Прогрес <b id="nc-name"></b> на цьому телефоні буде стерто. Точно?</p><div class="row"><button id="btn-new-yes" style="flex:1">Так, почати заново</button><button class="ghost" id="btn-new-no" style="flex:1">Ні</button></div></div>
+      </div>
+      <div id="newform" class="screen" style="gap:14px">
+        <div class="row">
+          <div class="field"><label for="in-name">Прізвище та ім'я</label><input type="text" id="in-name" autocomplete="name" placeholder="Коваленко Олена"></div>
+          <div class="field" style="flex:0 1 110px"><label for="in-class">Клас</label><input type="text" id="in-class" placeholder="7-А" maxlength="6"></div>
+        </div>
+        <p id="start-err" style="color:var(--bad)" hidden>Впиши прізвище, ім'я та клас, щоб учитель побачив твій результат.</p>
+        <button class="primary" id="btn-start">На борт!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section id="scr-map" class="screen" hidden>
+    <div class="bot" data-bot><svg></svg><div class="bubble" id="map-say"></div></div>
+    <div class="card">
+      <h2>Корабель «Пітон-1»</h2>
+      <div class="ship">
+        <svg viewBox="0 0 120 300" aria-hidden="true">
+          <path class="sec" id="sec3" d="M60 6 C82 30 92 56 94 78 L26 78 C28 56 38 30 60 6Z"/>
+          <rect class="sec" id="sec2" x="26" y="84" width="68" height="58" rx="4"/>
+          <rect class="sec" id="sec1" x="26" y="148" width="68" height="58" rx="4"/>
+          <path class="sec" id="sec0" d="M26 212 H94 V246 L108 276 H12 L26 246Z"/>
+          <circle cx="60" cy="112" r="10" fill="var(--term)" stroke="var(--line)" stroke-width="2"/>
+        </svg>
+        <div class="levels" id="levels"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LESSON -->
+  <section id="scr-lesson" class="screen" hidden>
+    <div class="card">
+      <div class="eyebrow" id="l-eyebrow"></div>
+      <h2 id="l-title"></h2>
+      <div class="bot" data-bot><svg></svg><div class="bubble" id="l-story"></div></div>
+      <ul class="points" id="l-points"></ul>
+    </div>
+    <div class="card">
+      <h3>Пісочниця: спробуй сам</h3>
+      <p class="muted" style="font-size:14px">Торкнися прикладу або напиши свій вираз і натисни «Run». Тут можна помилятися скільки завгодно.</p>
+      <div class="chips" id="l-chips"></div>
+      <div id="l-con"></div>
+    </div>
+    <button class="primary" id="btn-tasks">До ремонту!</button>
+  </section>
+
+  <!-- TASK -->
+  <section id="scr-task" class="screen" hidden>
+    <div class="row" style="justify-content:space-between;align-items:baseline;font-family:var(--f-mono);font-size:13px;color:var(--muted)"><span id="t-where"></span><button class="link" id="btn-relesson" style="padding:0">Повторити урок</button></div>
+    <div class="prog" id="t-prog"></div>
+    <div class="card">
+      <h2 id="t-title"></h2>
+      <div id="t-body"></div>
+      <p class="q" id="t-q"></p>
+      <div id="t-answer"></div>
+      <div id="t-fb" hidden></div>
+      <button class="primary" id="btn-next" hidden>Далі</button>
+    </div>
+  </section>
+
+  <!-- LEVEL DONE -->
+  <section id="scr-done" class="screen" hidden>
+    <div class="card" style="gap:18px">
+      <div class="eyebrow">Система відремонтована</div>
+      <h2 id="d-title"></h2>
+      <div class="bot happy" data-bot><svg></svg><div class="bubble" id="d-say"></div></div>
+      <div class="tstars" id="d-stars"></div>
+      <button class="primary" id="btn-done">Далі</button>
+    </div>
+  </section>
+
+  <!-- LAUNCH -->
+  <section id="scr-launch" class="screen" hidden>
+    <div class="launch" id="launch">
+      <div class="count" id="countlog"></div>
+      <svg class="rk" viewBox="0 0 70 150" aria-hidden="true">
+        <path class="flame" d="M24 118 Q35 150 46 118Z" fill="var(--accent)" style="transform-origin:35px 118px"/>
+        <path d="M35 2 C52 22 56 44 56 60 V106 L66 120 H4 L14 106 V60 C14 44 18 22 35 2Z" fill="var(--panel2)" stroke="var(--accent)" stroke-width="2"/>
+        <circle cx="35" cy="56" r="9" fill="var(--term)" stroke="var(--accent)" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="card"><h2>Ми летимо додому!</h2><div class="bot happy" data-bot><svg></svg><div class="bubble">Дякую, капітане! Тепер ти знаєш, як Python рахує. Глянь свій бортовий журнал і надішли його вчителю.</div></div>
+      <button class="primary" id="btn-tores">Мій результат</button></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="scr-res" class="screen" hidden>
+    <div><div class="eyebrow">Бортовий журнал</div><h2 style="margin-top:4px">Мій результат</h2></div>
+    <div class="rcard">
+      <div class="rhead">
+        <div><span class="eyebrow">Python-квест · 7 клас</span><h2 id="r-name"></h2><span class="muted" id="r-sub"></span></div>
+        <span class="rank" id="r-rank"></span>
+      </div>
+      <div class="rgrid">
+        <div class="rstat main"><b id="r-grade"></b><span>оцінка</span></div>
+        <div class="rstat"><b id="r-stars"></b><span>зірок з 36</span></div>
+        <div class="rstat"><b id="r-sys"></b><span>систем полагоджено</span></div>
+        <div class="rstat"><b id="r-badges"></b><span>нагород</span></div>
+      </div>
+      <div class="badges" id="r-badgelist"></div>
+      <p id="r-note" class="muted" style="font-size:14px"></p>
+    </div>
+    <div class="card">
+      <h3>Зірки за кожне завдання</h3>
+      <div style="overflow-x:auto"><table><thead><tr><th>Система</th><th>Завдання</th><th>Зірки</th></tr></thead><tbody id="r-table"></tbody></table></div>
+      <p class="muted" style="font-size:13px">★★★ з першої спроби · ★★ з другої · ★ з третьої і далі · без зірок, якщо відкрито розв'язок. Оцінка = зірки ÷ 3.</p>
+    </div>
+    <button class="primary" id="btn-resback">Повернутися до гри</button>
+    <p class="muted" style="font-size:13px">Прогрес зберігається лише на цьому телефоні, у цьому браузері.</p>
+  </section>
+</div>
+
+<script>
+(function(){
+const KEY="pyq7_save_v2";
+const $=id=>document.getElementById(id);
+const SCREENS=["scr-start","scr-map","scr-lesson","scr-task","scr-done","scr-launch","scr-res"];
+let cur="scr-start",back="scr-map";
+function show(id){SCREENS.forEach(s=>$(s).hidden=s!==id);cur=id;$("hud").hidden=!P||id==="scr-start";updateHud();window.scrollTo(0,0)}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+
+/* ---------- robot ---------- */
+const BOT=`<svg viewBox="0 0 56 62" aria-hidden="true"><line x1="28" y1="2" x2="28" y2="12" stroke="var(--muted)" stroke-width="2"/><circle cx="28" cy="4" r="3.5" fill="var(--accent)"/><rect x="6" y="12" width="44" height="34" rx="10" fill="var(--panel2)" stroke="var(--accent)" stroke-width="2"/><g class="eyes"><circle class="eye" cx="20" cy="28" r="4.5" fill="var(--ok)"/><circle class="eye" cx="36" cy="28" r="4.5" fill="var(--ok)"/></g><rect x="20" y="37" width="16" height="3" rx="1.5" fill="var(--muted)"/><rect x="14" y="48" width="28" height="12" rx="4" fill="var(--panel2)" stroke="var(--line)" stroke-width="2"/></svg>`;
+document.querySelectorAll("[data-bot] svg").forEach(s=>s.outerHTML=BOT);
+function botMood(el,mood){const b=el.closest("[data-bot]")||el;b.classList.remove("happy");void b.offsetWidth;if(mood==="happy")b.classList.add("happy");
+  b.querySelectorAll(".eye").forEach(e=>{e.setAttribute("fill",mood==="sad"?"var(--accent)":"var(--ok)");e.setAttribute("r",mood==="sad"?"3":"4.5")})}
+
+/* ---------- RNG ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuffle(arr,rnd){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ---------- mini Python ---------- */
+function PyErr(py,tip){this.py=py;this.tip=tip}
+function tokenize(src){
+  const toks=[];let i=0;
+  while(i<src.length){
+    const ch=src[i];
+    if(/\s/.test(ch)){i++;continue}
+    if(/\d/.test(ch)||(ch==="."&&/\d/.test(src[i+1]||""))){let j=i;while(j<src.length&&/[\d_]/.test(src[j]))j++;let f=false;if(src[j]==="."){f=true;j++;while(j<src.length&&/\d/.test(src[j]))j++}
+      const raw=src.slice(i,j).replace(/_/g,"");toks.push(f?{k:"num",t:"float",v:parseFloat(raw)}:{k:"num",t:"int",v:BigInt(raw)});i=j;continue}
+    if(ch==='"'||ch==="'"){let j=i+1;while(j<src.length&&src[j]!==ch)j++;if(j>=src.length)throw new PyErr("SyntaxError: unterminated string literal","Лапки треба закрити таким самим знаком, яким відкрили.");toks.push({k:"str",v:src.slice(i+1,j)});i=j+1;continue}
+    if(/[A-Za-z_Ѐ-ӿ]/.test(ch)){let j=i;while(j<src.length&&/[\wЀ-ӿ]/.test(src[j]))j++;toks.push({k:"id",v:src.slice(i,j)});i=j;continue}
+    const two=src.slice(i,i+2);
+    if(two==="**"||two==="//"){toks.push({k:"op",v:two});i+=2;continue}
+    if("+-*/%(),=".includes(ch)){toks.push({k:"op",v:ch});i++;continue}
+    if("×·xх".includes(ch))throw new PyErr(`SyntaxError: invalid character '${ch}'`,"У Python множення пишуть зірочкою: *");
+    if(":÷".includes(ch))throw new PyErr(`SyntaxError: invalid syntax`,"Ділення в Python позначають / або //");
+    if("«»“”".includes(ch))throw new PyErr(`SyntaxError: invalid character '${ch}'`,'Для тексту використовуй прості лапки: " або \'');
+    throw new PyErr(`SyntaxError: invalid character '${ch}'`,"Python не знає такого символу.");
+  }
+  return toks;
+}
+const I=v=>({t:"int",v}),F=v=>({t:"float",v}),S=v=>({t:"str",v});
+const num=x=>x.t==="int"?Number(x.v):x.v;
+const tname=x=>x.t;
+function frepr(x){if(Number.isNaN(x))return"nan";if(!isFinite(x))return x>0?"inf":"-inf";if(Number.isInteger(x)&&Math.abs(x)<1e16)return x.toFixed(1);return String(x)}
+function pstr(x){return x.t==="str"?x.v:x.t==="int"?x.v.toString():x.t==="none"?"None":frepr(x.v)}
+function prepr(x){return x.t==="str"?"'"+x.v+"'":pstr(x)}
+function zero(op,isF){return new PyErr("ZeroDivisionError: "+(op==="/"?(isF?"float division by zero":"division by zero"):op==="//"?(isF?"float floor division by zero":"integer division or modulo by zero"):(isF?"float modulo":"integer modulo by zero")),"На нуль ділити не можна навіть у Python.")}
+function binop(op,a,b){
+  if(a.t==="str"||b.t==="str"){
+    if(op==="+"&&a.t==="str"&&b.t==="str")return S(a.v+b.v);
+    if(op==="*"&&((a.t==="str"&&b.t==="int")||(a.t==="int"&&b.t==="str"))){const s=a.t==="str"?a.v:b.v,n=Number(a.t==="int"?a.v:b.v);if(n*s.length>2000)throw new PyErr("MemoryError","Забагато тексту для пісочниці.");return S(n>0?s.repeat(n):"")}
+    if(op==="+"&&a.t==="str")throw new PyErr(`TypeError: can only concatenate str (not "${tname(b)}") to str`,"Текст і число не додаються. Перетвори текст на число: int(\"5\")");
+    throw new PyErr(`TypeError: unsupported operand type(s) for ${op}: '${tname(a)}' and '${tname(b)}'`,"З текстом так рахувати не можна. Числа пиши без лапок.");
+  }
+  const isF=a.t==="float"||b.t==="float";
+  if(!isF){const x=a.v,y=b.v;
+    switch(op){case"+":return I(x+y);case"-":return I(x-y);case"*":return I(x*y);
+      case"/":if(y===0n)throw zero(op,false);return F(Number(x)/Number(y));
+      case"//":{if(y===0n)throw zero(op,false);let q=x/y;if(x%y!==0n&&((x<0n)!==(y<0n)))q-=1n;return I(q)}
+      case"%":{if(y===0n)throw zero(op,false);let r=x%y;if(r!==0n&&((r<0n)!==(y<0n)))r+=y;return I(r)}
+      case"**":if(y<0n)return F(Math.pow(Number(x),Number(y)));if(y>3000n)throw new PyErr("Пісочниця: число вийде занадто велике","Спробуй менший степінь.");return I(x**y);}}
+  const x=num(a),y=num(b);
+  switch(op){case"+":return F(x+y);case"-":return F(x-y);case"*":return F(x*y);
+    case"/":if(y===0)throw zero(op,true);return F(x/y);
+    case"//":if(y===0)throw zero(op,true);return F(Math.floor(x/y));
+    case"%":if(y===0)throw zero(op,true);return F(x-y*Math.floor(x/y));
+    case"**":return F(Math.pow(x,y));}
+}
+function runPy(src,env){
+  const toks=tokenize(src);if(!toks.length)return{kind:"none"};
+  let p=0;const peek=()=>toks[p],isOp=v=>toks[p]&&toks[p].k==="op"&&toks[p].v===v;
+  const syn=()=>new PyErr("SyntaxError: invalid syntax",/\d,\d/.test(src)?"Дробову частину в Python пишуть через крапку: 2.5":"Перевір, чи нічого не пропущено між числами й знаками.");
+  function expect(v){if(!isOp(v)){if(v===")")throw new PyErr("SyntaxError: '(' was never closed","Кожну відкриту дужку треба закрити.");throw syn()}p++}
+  function expr(){let l=term();while(isOp("+")||isOp("-")){const op=toks[p++].v;l=binop(op,l,term())}return l}
+  function term(){let l=unary();while(isOp("*")||isOp("/")||isOp("//")||isOp("%")){const op=toks[p++].v;l=binop(op,l,unary())}return l}
+  function unary(){if(isOp("-")){p++;const v=unary();if(v.t==="str")throw new PyErr("TypeError: bad operand type for unary -: 'str'","Мінус перед текстом не працює.");return v.t==="int"?I(-v.v):F(-v.v)}if(isOp("+")){p++;return unary()}return power()}
+  function power(){const b=atom();if(isOp("**")){p++;return binop("**",b,unary())}return b}
+  function call(name){p++;const args=[];if(!isOp(")")){args.push(expr());while(isOp(",")){p++;args.push(expr())}}expect(")");
+    if(name==="int"){const a=args[0];if(!a)return I(0n);if(a.t==="int")return a;if(a.t==="float")return I(BigInt(Math.trunc(a.v)));if(/^\s*[+-]?\d+\s*$/.test(a.v))return I(BigInt(a.v.trim()));throw new PyErr(`ValueError: invalid literal for int() with base 10: '${a.v}'`,"int() перетворює на число лише текст із цифр, наприклад int(\"42\").")}
+    if(name==="float"){const a=args[0];if(!a)return F(0);if(a.t!=="str")return F(num(a));const v=parseFloat(a.v);if(isNaN(v)||!/^\s*[+-]?(\d+\.?\d*|\.\d+)\s*$/.test(a.v))throw new PyErr(`ValueError: could not convert string to float: '${a.v}'`,"Пиши число з крапкою, наприклад \"2.5\".");return F(v)}
+    if(name==="abs"){const a=args[0];return a.t==="int"?I(a.v<0n?-a.v:a.v):F(Math.abs(a.v))}
+    if(name==="input")throw new PyErr("Пісочниця: input() тут не працює","Тут немає клавіатури для програми. Впиши число одразу, наприклад: int(\"25\")");
+    if(name==="print")throw new PyErr("Пісочниця: print() пиши на початку рядка","Наприклад: print(2 + 3)");
+    throw new PyErr(`NameError: name '${name}' is not defined`,"Такої функції Python не знає. Перевір написання.")}
+  function atom(){const t=peek();if(!t)throw new PyErr("SyntaxError: invalid syntax","Вираз обірвався. Чого бракує в кінці?");
+    if(t.k==="num"){p++;return t.t==="int"?I(t.v):F(t.v)}
+    if(t.k==="str"){p++;return S(t.v)}
+    if(t.k==="op"&&t.v==="("){p++;const v=expr();expect(")");return v}
+    if(t.k==="id"){p++;if(isOp("("))return call(t.v);if(t.v in env)return env[t.v];
+      if(["int","float","print","input","abs"].includes(t.v))throw new PyErr(`Пісочниця: після ${t.v} потрібні дужки`,`Наприклад: ${t.v}(…)`);
+      throw new PyErr(`NameError: name '${t.v}' is not defined`,`Змінної ${t.v} ще немає. Спочатку створи її: ${t.v} = 5`)}
+    throw syn()}
+  let res;
+  if(toks[0].k==="id"&&toks[1]&&toks[1].k==="op"&&toks[1].v==="="){
+    const name=toks[0].v;if(["print","int","input","float","abs"].includes(name))throw new PyErr("Пісочниця: так змінну краще не називати",`${name} — це назва функції Python.`);
+    p=2;const v=expr();if(p<toks.length)throw syn();env[name]=v;return{kind:"assign",name,value:v}}
+  if(toks[0].k==="id"&&toks[0].v==="print"&&toks[1]&&toks[1].k==="op"&&toks[1].v==="("){
+    p=2;const args=[];if(!isOp(")")){args.push(expr());while(isOp(",")){p++;args.push(expr())}}expect(")");if(p<toks.length)throw syn();
+    return{kind:"print",text:args.map(pstr).join(" "),value:args.length===1?args[0]:null}}
+  res=expr();if(p<toks.length)throw syn();
+  return{kind:"expr",value:res};
+}
+
+/* console widget */
+function makeConsole(host,opts){
+  opts=opts||{};const env={};
+  host.innerHTML=`<div class="con"><div class="bar"><span>${opts.title||"консоль Python"}</span><span>Python 3</span></div><div class="log" aria-live="polite"><span class="empty">${opts.empty||"Тут з'явиться результат"}</span></div><form autocomplete="off"><span>&gt;&gt;&gt;</span><input type="text" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Рядок Python" placeholder="${opts.ph||"2 + 3 * 4"}"><button class="primary" type="submit">${opts.btn||"Run"}</button></form><div class="keys">${["+","-","*","/","//","%","**","(",")"].map(k=>`<button type="button" data-k="${k}">${k}</button>`).join("")}</div></div>`;
+  const log=host.querySelector(".log"),inp=host.querySelector("input"),form=host.querySelector("form");
+  host.querySelectorAll(".keys button").forEach(b=>b.onclick=()=>{const k=b.dataset.k,s=inp.selectionStart??inp.value.length,e=inp.selectionEnd??s;const ins=k.length===1&&"()".includes(k)?k:" "+k+" ";inp.value=inp.value.slice(0,s)+ins+inp.value.slice(e);const c=s+ins.length;inp.focus({preventScroll:true});try{inp.setSelectionRange(c,c)}catch(_){}});
+  function add(html){const em=log.querySelector(".empty");if(em)em.remove();log.insertAdjacentHTML("beforeend",html);log.scrollTop=log.scrollHeight}
+  function exec(src){
+    add(`<div class="in"><b>&gt;&gt;&gt;</b> ${esc(src)}</div>`);if(opts.onRun)opts.onRun();
+    try{const r=runPy(src,env);
+      if(r.kind==="print")add(`<div class="out">${esc(r.text)}</div>`);
+      else if(r.kind==="expr")add(`<div class="out">${esc(prepr(r.value))}</div>`);
+      return r}
+    catch(e){if(e instanceof PyErr){add(`<div class="err">${esc(e.py)}</div><div class="tip">Підказка: ${esc(e.tip)}</div>`);return{kind:"error",err:e}}throw e}
+  }
+  form.onsubmit=ev=>{ev.preventDefault();const src=inp.value.trim();if(!src)return;
+    if(opts.onSubmit){opts.onSubmit(src,exec,inp)}else{exec(src);inp.value=""}};
+  return{exec,inp,form,setDisabled(d){inp.disabled=d;form.querySelector("button").disabled=d;host.querySelectorAll(".keys button").forEach(b=>b.disabled=d)}};
+}
+
+/* ---------- levels & tasks ---------- */
+const LEVELS=[
+ {sys:"Двигун",title:"Рахуємо, як у математиці",topic:"+ − * та порядок дій",
+  story:"Двигун не запускається: комп'ютер має порахувати пальне. Python рахує, як ти на математиці, але знаки трохи інші.",
+  points:["Множення пишемо зірочкою <code>*</code>, а не крапкою чи хрестиком.","Спочатку виконується <code>*</code> і <code>/</code>, потім <code>+</code> і <code>-</code>.","Дужки <code>( )</code> змінюють порядок: те, що в дужках, рахується першим."],
+  chips:["2 + 3 * 4","(2 + 3) * 4","100 - 7 * 6","print(5 * 5)"],
+  done:"Двигун гуде! Ти навчив(-ла) мене рахувати з правильним порядком дій."},
+ {sys:"Вантажний відсік",title:"Ділимо на рівні частини",topic:"// та %",
+  story:"У відсіку розсипалися гвинти. Треба розкласти їх у коробки порівну й дізнатися, скільки залишиться. Для цього в Python є два особливі знаки.",
+  points:["<code>//</code> — цілочисельне ділення: скільки цілих разів одне число вміщається в інше. <code>17 // 5</code> дає 3.","<code>%</code> — остача від ділення: що залишилось. <code>17 % 5</code> дає 2.","Перевірка: <code>5 * 3 + 2 = 17</code>. Частка разом з остачею завжди відновлюють число."],
+  chips:["17 // 5","17 % 5","100 // 7","100 % 7","10 % 2"],
+  done:"Усе розкладено по коробках! Тепер ти знаєш // і %."},
+ {sys:"Реактор",title:"Степінь, дроби та змінні",topic:"** / та змінні",
+  story:"Реактор працює на степенях двійки, а датчики показують дробові числа. А ще комп'ютер зберігає показники у змінних.",
+  points:["<code>**</code> — степінь: <code>2 ** 5</code> це 2·2·2·2·2 = 32.","<code>/</code> — звичайне ділення. Результат завжди з крапкою: <code>10 / 2</code> дає <code>5.0</code>.","Змінна — це коробка з іменем: <code>x = 7</code> кладе 7 у коробку x. Потім <code>x = x + 1</code> робить її 8."],
+  chips:["2 ** 10","10 / 2","7 / 2","x = 7","x * 3","2 ** 100"],
+  done:"Реактор стабільний! Степінь, ділення і змінні під контролем."},
+ {sys:"Пульт керування",title:"Консольна програма",topic:"input, int, print",
+  story:"Останнє — пульт. Він питає капітана числа через клавіатуру й виводить відповіді на екран. Так працює справжня консольна програма.",
+  points:["<code>input()</code> чекає, поки користувач щось введе, і завжди повертає <b>текст</b>.","<code>int(...)</code> перетворює текст на ціле число: <code>int(\"25\")</code> дає 25. Тому пишемо <code>a = int(input())</code>.","<code>print(\"Решта:\", 13)</code> виводить значення через пробіл, без лапок: <code>Решта: 13</code>."],
+  chips:['"2" + "3"','int("2") + int("3")','print("Решта:", 50 - 37)','"ха" * 3'],
+  done:"Пульт світиться! Корабель готовий до старту!"}
+];
+const SYS_OF=i=>Math.floor(i/3);
+const BYTE_OK=["Біп-біп, правильно!","Точно, як у Python!","Клас! Лампочка загорілась!","Ти справжній програміст!","Бездоганно!"];
+const BYTE_NO=["Хм, Python порахує інакше.","Майже! Подивись уважніше.","Біп… помилка. Спробуй ще!"];
+
+function makeTasks(seed){
+  const rnd=mulberry32(seed*7919+13),R=(a,b)=>a+Math.floor(rnd()*(b-a+1));const T=[];
+  // L1
+  let a=R(2,9),b=R(2,6),c=R(2,5);
+  T.push({title:"Скільки пального?",code:`print(${a} + ${b} * ${c})`,q:"Яке число виведе програма?",type:"num",ans:String(a+b*c),
+    hint:"Що виконується першим: + чи *?",explain:`Спочатку <code>${b} * ${c} = ${b*c}</code>, потім <code>${a} + ${b*c} = ${a+b*c}</code>.`});
+  a=R(2,9);b=R(2,6);c=R(2,5);
+  T.push({title:"Дужки на пульті",code:`print((${a} + ${b}) * ${c})`,q:"Яке число виведе програма?",type:"num",ans:String((a+b)*c),
+    hint:"Те, що в дужках, рахується першим.",explain:`Спочатку дужки: <code>${a} + ${b} = ${a+b}</code>, потім <code>${a+b} * ${c} = ${(a+b)*c}</code>.`});
+  a=R(3,6);b=R(6,9);c=R(2,9);
+  T.push({title:"Порахуй болти",type:"expr",story:`У Байта <b>${a}</b> ящики, у кожному по <b>${b}</b> болтів, і ще <b>${c}</b> болтів лежать окремо.`,
+    q:"Напиши вираз Python, який порахує всі болти, і натисни «Перевірити».",target:a*b+c,need:["*","+"],ph:"ящики * болти + ...",
+    hint:"Спочатку кількість у ящиках (множення), потім додай окремі.",explain:`Наприклад: <code>${a} * ${b} + ${c}</code> = ${a*b+c}.`,ans:`${a} * ${b} + ${c}`});
+  // L2
+  let k=R(3,7),n=R(20,59);if(n%k===0)n+=1;
+  T.push({title:"Коробки з гвинтами",code:`# ${n} гвинтів розкладаємо по ${k} у коробку\nprint(${n} // ${k})`,q:"Скільки повних коробок вийде? (що виведе програма)",type:"num",ans:String(Math.floor(n/k)),
+    hint:"// відкидає дробову частину. Скільки разів "+k+" вміщається в "+n+"?",explain:`<code>${n} // ${k}</code> = ${Math.floor(n/k)}, бо ${k} · ${Math.floor(n/k)} = ${k*Math.floor(n/k)}, а на ще одну коробку не вистачає.`});
+  k=R(4,8);n=R(30,70);if(n%k===0)n+=1;
+  T.push({title:"Що не влізло?",type:"expr",story:`<b>${n}</b> батарейок розкладають по <b>${k}</b> у кожен пульт.`,
+    q:"Напиши вираз Python, який покаже, скільки батарейок залишиться зайвих.",target:n%k,need:["%"],ph:"? % ?",
+    hint:"Залишок від ділення дає оператор %.",explain:`<code>${n} % ${k}</code> = ${n%k}.`,ans:`${n} % ${k}`});
+  T.push({title:"Таймер ремонту",code:`t = int(input())  # секунди\nm = t ▢ 60\ns = t ▢ 60\nprint(m, "хв", s, "с")`,q:"Які оператори треба поставити на місце ▢ (по черзі)?",type:"choice",
+    opts:shuffle(["//  та  %","/  та  %","%  та  //","*  та  /"],rnd),ans:"//  та  %",
+    hint:"Хвилини — скільки цілих разів 60 вміщається. Секунди — що залишилось.",explain:`Цілі хвилини дає <code>t // 60</code>, залишок секунд дає <code>t % 60</code>. Наприклад, 150 с = 2 хв 30 с. Спробуй у пісочниці: <code>150 // 60</code> і <code>150 % 60</code>.`});
+  // L3
+  let p=3;
+  T.push({title:"Енергія реактора",code:`# енергія подвоюється щосекунди\nprint(2 ** ${p})`,q:"Яке число виведе програма?",type:"num",ans:String(2**p),
+    hint:"2 ** "+p+" — це 2, помножене саме на себе "+p+" разів.",explain:`<code>2 ** ${p}</code> = ${Array(p).fill(2).join(" · ")} = ${2**p}.`});
+  k=R(2,5);let m=R(2,6);n=k*m;
+  T.push({title:"Датчик тиску",code:`print(${n} / ${k})`,q:"Що саме з'явиться в консолі?",type:"choice",opts:shuffle([`${m}.0`,`${m}`,`Помилка`],rnd),ans:`${m}.0`,
+    hint:"Згадай урок: який результат завжди дає звичайне ділення /?",explain:`Навіть коли ділиться без остачі, <code>/</code> дає число з крапкою (float): <code>${m}.0</code>. Ціле число дає <code>//</code>.`});
+  a=R(3,9);b=R(2,8);c=R(1,9);
+  T.push({title:"Стеж за змінною",code:`x = ${a}\nx = x + ${b}\nx = x * 2\nx = x - ${c}\nprint(x)`,q:"Яке число виведе програма?",type:"num",ans:String((a+b)*2-c),
+    hint:"Виконуй рядки по черзі й записуй нове значення x після кожного.",explain:`x: ${a} → ${a+b} → ${(a+b)*2} → ${(a+b)*2-c}.`});
+  // L4
+  T.push({title:"Пульт питає вік капітана",code:`# капітан вводить свій вік\n___\nprint("Через рік тобі", vik + 1)`,q:"Який рядок треба вставити замість ___?",type:"choice",
+    opts:shuffle(["vik = int(input())","vik = input()","vik = input(int)","int vik = input()"],rnd),ans:"vik = int(input())",
+    hint:"input() завжди повертає текст. Як зробити з нього число?",explain:`<code>input()</code> повертає текст, а <code>int(...)</code> перетворює його на число. Тоді <code>vik + 1</code> працює.`});
+  let x=R(1,9),y=R(1,9);
+  T.push({title:"Дивна сума",code:`a = input()\nb = input()\nprint(a + b)`,stdin:[x,y],q:"Що виведе програма?",type:"num",ans:`${x}${y}`,
+    hint:"Без int() введені значення залишаються текстом. Що робить + з текстом? Спробуй у пісочниці: \"2\" + \"3\"",explain:`Без <code>int()</code> це тексти "${x}" і "${y}". Плюс їх склеює: <code>${x}${y}</code>. Виправлення: <code>a = int(input())</code>.`});
+  p=R(12,35);let cnt=R(2,4),tot=p*cnt,money=Math.ceil((tot+1)/50)*50;
+  T.push({title:"Фінал: каса космоїдальні",code:`price = int(input())  # ціна космобулочки\ncount = int(input())  # скільки купили\nmoney = int(input())  # скільки дали грн\nchange = money - price * count\nprint("Решта:", change)`,stdin:[p,cnt,money],q:"Яке число надрукує програма після «Решта:»?",type:"num",ans:String(money-tot),
+    hint:"Спочатку вартість: price * count. Потім віднімаємо її від money.",explain:`Вартість: <code>${p} * ${cnt} = ${tot}</code>. Решта: <code>${money} - ${tot} = ${money-tot}</code>.`});
+  return T;
+}
+
+/* ---------- highlighter ---------- */
+function hl(line){
+  const re=/("[^"]*")|(#.*$)|\b(print|int|input|float)\b|\b(\d+)\b|(___|▢)/g;let out="",last=0,mm;
+  while((mm=re.exec(line))){out+=esc(line.slice(last,mm.index));
+    if(mm[1])out+=`<span class="t-str">${esc(mm[1])}</span>`;else if(mm[2])out+=`<span class="t-com">${esc(mm[2])}</span>`;
+    else if(mm[3])out+=`<span class="t-kw">${mm[3]}</span>`;else if(mm[4])out+=`<span class="t-num">${mm[4]}</span>`;
+    else if(mm[5])out+=`<span class="t-blank">${mm[5]==="___"?"&nbsp;?&nbsp;":"?"}</span>`;last=re.lastIndex}
+  return out+esc(line.slice(last));
+}
+
+/* ---------- save ---------- */
+let P=null,TASKS=null;
+function norm(s){return String(s).trim().replace(/\s+/g," ").toLowerCase()}
+function normClass(s){return String(s).trim().replace(/\s+/g,"").replace(/[–—_ ]/g,"-").toUpperCase()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(P))}catch(e){}}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&s.v===2&&Array.isArray(s.stars))return s}catch(e){}return null}
+let lastTick=Date.now();
+setInterval(()=>{if(P&&document.visibilityState==="visible"){const now=Date.now();P.secs+=Math.min(60,(now-lastTick)/1000);lastTick=now;save()}else lastTick=Date.now()},15000);
+document.addEventListener("visibilitychange",()=>{lastTick=Date.now()});
+
+function starsTotal(){return P.stars.reduce((s,v)=>s+Math.max(0,v),0)}
+function doneCount(){return P.stars.filter(v=>v>=0).length}
+function gradeOf(st){return Math.max(1,Math.round(st/3))}
+function starStr(n,max=3){return "★".repeat(n)+`<span class="off">${"★".repeat(max-n)}</span>`}
+function updateHud(){if(!P)return;const st=starsTotal(),{r,next}=rankOf(st);
+  $("p-ava").textContent=(P.name.trim()[0]||"?").toUpperCase();$("p-name").textContent=`${P.name} · ${P.cls}`;$("p-stars").textContent=`★ ${st}/36`;
+  $("p-bar").style.width=Math.max(3,st/36*100)+"%";$("p-rank").textContent=next?`${r[1]} · до «${next[1]}» ще ${next[0]-st} ★`:r[1];checkBadges()}
+function levelDone(L){for(let i=L*3;i<L*3+3;i++)if(P.stars[i]<0)return false;return true}
+function levelOpen(L){return L===0||levelDone(L-1)}
+function firstUndone(){const i=P.stars.findIndex(v=>v<0);return i}
+
+/* ---------- start ---------- */
+function initStart(){
+  const s=load();
+  if(s){$("resume").hidden=false;$("newform").hidden=true;$("resume-name").textContent=`${s.name}, ${s.cls}`;$("nc-name").textContent=s.name}
+  else{$("resume").hidden=true;$("newform").hidden=false}
+}
+$("btn-resume").onclick=()=>{shownBadges=null;P=load();TASKS=makeTasks(P.seed);lastTick=Date.now();openMap()};
+$("btn-new").onclick=()=>{$("new-confirm").hidden=false};
+$("btn-new-no").onclick=()=>{$("new-confirm").hidden=true};
+$("btn-new-yes").onclick=()=>{try{localStorage.removeItem(KEY)}catch(e){}$("new-confirm").hidden=true;$("resume").hidden=true;$("newform").hidden=false};
+$("btn-start").onclick=()=>{
+  const name=$("in-name").value.trim().replace(/\s+/g," "),cls=$("in-class").value.trim();
+  if(name.length<3||!cls){$("start-err").hidden=false;return}
+  $("start-err").hidden=true;
+  P={v:2,name,cls:normClass(cls),seed:Math.floor(Math.random()*1024),stars:Array(12).fill(-1),tries:Array(12).fill(0),revealed:Array(12).fill(false),secs:0,seenLesson:[false,false,false,false],started:Date.now()};
+  shownBadges=null;TASKS=makeTasks(P.seed);save();lastTick=Date.now();openMap();
+};
+
+/* ---------- map ---------- */
+function openMap(){
+  const L=Math.min(3,SYS_OF(firstUndone()<0?11:firstUndone()));
+  const all=firstUndone()<0;
+  $("map-say").innerHTML=all?"Усі системи працюють! Можна злітати. Натисни на будь-яку систему, щоб повторити урок.":
+    doneCount()===0?`Почнімо з системи <b>${LEVELS[0].sys}</b>. Спочатку короткий урок, потім ремонт.`:`Наступна система: <b>${LEVELS[L].sys}</b>. Вперед, капітане ${esc(P.name.split(" ").slice(-1)[0])}!`;
+  botMood($("map-say"),"ok");
+  $("levels").innerHTML=LEVELS.slice().map((lv,i)=>({lv,i})).reverse().map(({lv,i})=>{
+    const open=levelOpen(i),done=levelDone(i),st=P.stars.slice(i*3,i*3+3).reduce((s,v)=>s+Math.max(0,v),0),cnt=P.stars.slice(i*3,i*3+3).filter(v=>v>=0).length;
+    return `<button class="lvl ${!all&&i===L?"cur":""} ${open?"":"locked"}" data-l="${i}" ${open?"":"disabled"}><span class="t">${i+1}. ${lv.sys}</span><span class="s">${lv.topic}</span><span class="st">${open?(done?"Полагоджено · ":`${cnt}/3 · `)+"★ "+st+"/9":"Закрито"}</span></button>`}).join("");
+  $("levels").querySelectorAll("button").forEach(b=>b.onclick=()=>openLesson(+b.dataset.l));
+  for(let i=0;i<4;i++){const s=$("sec"+i);s.classList.toggle("done",levelDone(i));s.classList.toggle("cur",!all&&i===L)}
+  show("scr-map");
+}
+$("hud-map").onclick=openMap;
+
+/* ---------- lesson ---------- */
+let LV=0,lessonCon=null;
+function openLesson(L){
+  LV=L;const lv=LEVELS[L];
+  $("l-eyebrow").textContent=`Система ${L+1} з 4 · ${lv.sys}`;$("l-title").textContent=lv.title;
+  $("l-story").innerHTML=lv.story;botMood($("l-story"),"ok");
+  $("l-points").innerHTML=lv.points.map(p=>`<li><span>${p}</span></li>`).join("");
+  lessonCon=makeConsole($("l-con"),{title:"пісочниця",onRun:()=>{P.runs=(P.runs||0)+1;save();checkBadges()}});
+  $("l-chips").innerHTML=lv.chips.map(c=>`<button type="button">${esc(c)}</button>`).join("");
+  $("l-chips").querySelectorAll("button").forEach(b=>b.onclick=()=>lessonCon.exec(b.textContent));
+  const done=levelDone(L);$("btn-tasks").textContent=done?"Система вже полагоджена · до мапи":"До ремонту!";
+  P.seenLesson[L]=true;save();show("scr-lesson");
+}
+$("btn-tasks").onclick=()=>{if(levelDone(LV)){openMap();return}const i=P.stars.slice(LV*3,LV*3+3).findIndex(v=>v<0);openTask(LV*3+i)};
+
+/* ---------- task ---------- */
+let TI=0,locked=false,taskCon=null;
+function openTask(i){
+  TI=i;locked=false;const t=TASKS[i],L=SYS_OF(i);
+  $("t-where").textContent=`${LEVELS[L].sys} · завдання ${i%3+1} з 3`;
+  $("t-prog").innerHTML=[0,1,2].map(j=>{const k=L*3+j;return `<span class="${P.stars[k]>=0?"done":k===i?"cur":""}"></span>`}).join("");
+  $("t-title").textContent=t.title;
+  let body="";
+  if(t.story)body+=`<div class="bot" data-bot>${BOT}<div class="bubble">${t.story}</div></div>`;
+  if(t.code)body+=`<div class="code"><div class="bar"><span>main.py</span><span>Python 3</span></div><pre>${t.code.split("\n").map(l=>`<span class="ln">${hl(l)}</span>`).join("")}</pre></div>`;
+  if(t.stdin)body+=`<div class="stdin" style="margin-top:10px"><span class="h">Користувач вводить:</span>${t.stdin.map(v=>`<span class="v">&gt; ${v}</span>`).join("")}</div>`;
+  $("t-body").innerHTML=body;
+  $("t-q").textContent=t.q;$("t-fb").hidden=true;$("btn-next").hidden=true;
+  const box=$("t-answer");
+  if(t.type==="num"){
+    box.innerHTML=`<form class="answer" id="ans-form"><input type="text" id="ans-in" inputmode="numeric" autocomplete="off" placeholder="Відповідь" aria-label="Відповідь"><button class="primary" type="submit">OK</button></form>`;
+    $("ans-form").onsubmit=e=>{e.preventDefault();if(locked)return;const v=$("ans-in").value.replace(/\s+/g,"").replace(",",".");if(!v)return;judge(v===t.ans)};
+  }else if(t.type==="choice"){
+    box.innerHTML=`<div class="choices">${t.opts.map((o,j)=>`<button type="button" data-i="${j}">${esc(o)}</button>`).join("")}</div>`;
+    box.querySelectorAll("button").forEach(b=>b.onclick=()=>{if(locked||b.classList.contains("wrong"))return;const ok=t.opts[+b.dataset.i]===t.ans;b.classList.add(ok?"right":"wrong");judge(ok)});
+  }else{
+    box.innerHTML=`<div id="expr-con"></div>`;
+    taskCon=makeConsole($("expr-con"),{title:"бортовий комп'ютер",btn:"Перевірити",ph:t.ph,empty:"Напиши вираз унизу. Числа бери з умови."});
+    taskCon.form.onsubmit=null;
+    taskCon.form.onsubmit=ev=>{ev.preventDefault();if(locked)return;const src=taskCon.inp.value.trim();if(!src)return;
+      const r=taskCon.exec(src);if(r.kind==="error"||r.kind==="none"){fb("try","<b>Python не зміг це виконати.</b><span>Прочитай підказку в консолі й виправ вираз. Спроба не рахується.</span>");return}
+      let ops=[];try{ops=tokenize(src).filter(x=>x.k==="op").map(x=>x.v)}catch(_){}
+      const val=r.value;
+      if(!val||val.t==="str"){fb("try","<b>Потрібне число, а не текст.</b><span>Пиши числа без лапок.</span>");return}
+      const missing=t.need.filter(o=>!ops.includes(o));
+      if(missing.length&&Number(num(val))===t.target){fb("try",`<b>Число правильне, але Байт просить саме вираз.</b><span>Використай оператор ${missing.map(o=>"<code>"+o+"</code>").join(" і ")}, щоб комп'ютер порахував сам.</span>`);return}
+      judge(val.t==="int"&&Number(val.v)===t.target,true);
+    };
+  }
+  if(P.tries[i]>0)renderHintState();
+  show("scr-task");
+}
+function fb(cls,html){const f=$("t-fb");f.hidden=false;f.className="fb "+cls;f.innerHTML=html}
+function renderHintState(){const t=TASKS[TI],n=P.tries[TI];
+  if(P.revealed[TI]){fb("show",`<b>Розв'язок</b><span>${t.explain}</span><span class="muted" style="font-size:14px">Тепер введи правильну відповідь, щоб полагодити деталь (зірок за неї не буде).</span>`);return}
+  const say=BYTE_NO[(n-1)%BYTE_NO.length];
+  fb("try",`<b>${say}</b><span>Підказка: ${t.hint}</span>${n>=2?`<button type="button" id="btn-reveal">Показати розв'язок (0 ★)</button>`:""}`);
+  const rb=$("btn-reveal");if(rb)rb.onclick=()=>{P.revealed[TI]=true;save();renderHintState()};
+}
+function judge(ok){
+  if(locked)return;const t=TASKS[TI];P.tries[TI]++;
+  if(!ok){save();renderHintState();const inp=$("ans-in");if(inp){inp.select()}return}
+  locked=true;const n=P.tries[TI];const st=P.revealed[TI]?0:n===1?3:n===2?2:1;P.stars[TI]=st;save();updateHud();
+  fb("ok",`<div class="tstars">${starStr(st)}</div><b>${BYTE_OK[TI%BYTE_OK.length]}</b><span>${t.explain}</span>`);
+  if(t.type==="choice")$("t-answer").querySelectorAll("button").forEach(b=>{if(t.opts[+b.dataset.i]===t.ans)b.classList.add("right")});
+  const inp=$("ans-in");if(inp){inp.disabled=true;inp.nextElementSibling.disabled=true}
+  if(t.type==="expr"&&taskCon)taskCon.setDisabled(true);
+  $("t-prog").children[TI%3].className="done";
+  $("btn-next").hidden=false;$("btn-next").textContent=TI%3===2?"Полагодити систему":"Наступне завдання";
+  $("t-fb").scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+$("btn-next").onclick=()=>{const L=SYS_OF(TI);if(levelDone(L))openDone(L);else{const j=P.stars.slice(L*3,L*3+3).findIndex(v=>v<0);openTask(L*3+j)}};
+$("btn-relesson").onclick=()=>openLesson(SYS_OF(TI));
+
+/* ---------- level done ---------- */
+function openDone(L){
+  const st=P.stars.slice(L*3,L*3+3).reduce((s,v)=>s+Math.max(0,v),0);
+  $("d-title").textContent=`${LEVELS[L].sys} працює!`;$("d-say").textContent=LEVELS[L].done;
+  $("d-stars").innerHTML=starStr(st,9)+` <span class="muted" style="font-size:14px;letter-spacing:0">${st} з 9</span>`;
+  $("btn-done").textContent=L===3?"Запуск!":"До мапи корабля";
+  $("btn-done").onclick=()=>L===3?openLaunch():openMap();
+  show("scr-done");
+}
+
+/* ---------- launch ---------- */
+function openLaunch(){
+  const box=$("launch");box.classList.remove("go");box.querySelectorAll(".dot").forEach(d=>d.remove());
+  for(let i=0;i<40;i++){const d=document.createElement("span");d.className="dot";d.style.left=Math.random()*100+"%";d.style.top=Math.random()*100+"%";box.appendChild(d)}
+  show("scr-launch");
+  const lines=[">>> for i in range(3, 0, -1):","...     print(i)","3","2","1",'>>> print("Старт!")',"Старт!"];
+  const log=$("countlog");log.textContent="";let k=0;
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const step=()=>{if(k<lines.length){log.textContent+=(k?"\n":"")+lines[k++];setTimeout(step,reduce?0:420)}else box.classList.add("go")};
+  step();
+}
+$("btn-tores").onclick=()=>openResults();
+
+/* ---------- ranks & badges ---------- */
+const RANKS=[[0,"Кадет"],[8,"Юнга-програміст"],[18,"Бортінженер"],[28,"Штурман Python"],[36,"Капітан коду"]];
+function rankOf(st){let r=RANKS[0],next=null;for(let i=0;i<RANKS.length;i++)if(st>=RANKS[i][0]){r=RANKS[i];next=RANKS[i+1]||null}return{r,next}}
+const BADGES=[
+ ["engine","*","Механік двигуна","Полагодити двигун",()=>levelDone(0)],
+ ["cargo","//","Вантажник","Полагодити вантажний відсік",()=>levelDone(1)],
+ ["reactor","**","Реакторник","Полагодити реактор",()=>levelDone(2)],
+ ["panel",">>>","Оператор пульта","Полагодити пульт керування",()=>levelDone(3)],
+ ["clean","9★","Чиста робота","Полагодити систему на всі 9 зірок",()=>[0,1,2,3].some(L=>levelDone(L)&&P.stars.slice(L*3,L*3+3).every(v=>v===3))],
+ ["sandbox","10+","Дослідник","Виконати 10 команд у пісочниці",()=>(P.runs||0)>=10],
+ ["nohint","!?","Сам собі навігатор","Пройти всі завдання, не відкриваючи розв'язку",()=>firstUndone()<0&&!P.revealed.some(Boolean)],
+ ["perfect","36","Ідеальний політ","Зібрати всі 36 зірок",()=>starsTotal()===36]
+];
+function earned(){return BADGES.filter(b=>b[4]())}
+let shownBadges=null;
+function toast(text){const t=document.createElement("div");t.className="toast";t.textContent=text;$("toasts").appendChild(t);setTimeout(()=>t.remove(),2800)}
+function checkBadges(){if(!P)return;const now=earned().map(b=>b[0]);if(shownBadges===null){shownBadges=new Set(now);return}
+  BADGES.forEach(b=>{if(now.includes(b[0])&&!shownBadges.has(b[0])){shownBadges.add(b[0]);toast("Нова нагорода: "+b[2])}})}
+
+/* ---------- results ---------- */
+function openResults(){
+  back=cur==="scr-res"?back:cur;
+  const st=starsTotal(),dc=doneCount(),g=gradeOf(st),{r}=rankOf(st),eb=earned().map(b=>b[0]);
+  const minutes=Math.max(1,Math.round(P.secs/60)),sys=[0,1,2,3].filter(levelDone).length;
+  const date=new Date().toLocaleDateString("uk-UA",{day:"numeric",month:"long",year:"numeric"});
+  $("r-name").textContent=P.name;$("r-sub").textContent=`${P.cls} · ${date} · у грі ${minutes} хв`;
+  $("r-rank").textContent=r[1];
+  $("r-grade").textContent=dc?g:"—";$("r-stars").textContent=st;$("r-sys").textContent=`${sys}/4`;$("r-badges").textContent=`${eb.length}/${BADGES.length}`;
+  $("r-badgelist").innerHTML=BADGES.map(b=>`<span class="badge${eb.includes(b[0])?"":" locked"}" title="${esc(b[3])}"><i>${esc(b[1])}</i>${esc(b[2])}</span>`).join("");
+  $("r-note").textContent=!dc?"Ти ще не пройшов(-ла) жодного завдання. Оцінка з'явиться після першого.":dc<12?`Пройдено ${dc} з 12 завдань. Оцінка рахується від усіх 36 зірок, тож вона росте з кожним завданням.`:st<36?"Усі системи полагоджено! Хочеш більше зірок наступного разу? Відповідай з першої спроби.":"Усі 36 зірок! Ти справжній капітан коду.";
+  $("r-table").innerHTML=TASKS.map((t,i)=>`<tr><td>${i%3===0?LEVELS[SYS_OF(i)].sys:""}</td><td>${esc(t.title)}</td><td class="s">${P.stars[i]<0?'<span class="muted" style="font-family:var(--f-body)">ще не пройдено</span>':starStr(P.stars[i])}</td></tr>`).join("");
+  show("scr-res");
+}
+$("hud-res").onclick=openResults;
+$("btn-resback").onclick=()=>{if(back==="scr-task")show("scr-task");else if(back==="scr-lesson")show("scr-lesson");else if(back==="scr-done")show("scr-done");else if(back==="scr-launch")show("scr-launch");else openMap()};
+
+initStart();
+})();
+</script>
+
+</body></html>
